@@ -3,37 +3,16 @@ import 'dart:ui'; // For blur
 import 'quiz_screen.dart'; // Import for going to quiz
 
 class OnboardingScreen extends StatefulWidget {
+  const OnboardingScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _OnboardingScreenState createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with SingleTickerProviderStateMixin {
+class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  late AnimationController _animationController; // Controller for GIF animation
-  late Animation<double> _fadeAnimation; // Fade effect for reverse simulation
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 3), // Adjust based on your GIF length
-    )..repeat(reverse: true); // Repeat with reverse
-    _fadeAnimation = Tween<double>(
-      begin: 0.3,
-      end: 1,
-    ).animate(_animationController);
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _pageController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,14 +20,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       body: Stack(
         children: [
           Positioned.fill(
-            child: FadeTransition(
-              opacity: _fadeAnimation, // Fade in/out to simulate reverse
-              child: Image.asset('assets/background.gif', fit: BoxFit.cover),
-            ),
+            child: Image.asset(
+              'assets/background.gif',
+              fit: BoxFit.cover,
+            ), // Direct GIF without fade
           ),
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              // ignore: deprecated_member_use
               child: Container(color: Colors.black.withOpacity(0.3)),
             ),
           ),
@@ -62,7 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
               _buildPage(
                 'How It Works',
-                'It starts with a 15-question test to remember your favorite genre and suggest movies daily based on it.',
+                'It starts with a 10-question test to remember your favorite genre and suggest movies daily based on it.', // Updated to 10 questions
               ),
               _buildPage(
                 'Quiz Guide',
@@ -150,7 +130,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
+            // ignore: deprecated_member_use
             backgroundColor: Colors.white.withOpacity(0.2),
+            // ignore: deprecated_member_use
             side: BorderSide(color: Colors.white.withOpacity(0.3)),
             padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
           ),
@@ -169,6 +151,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         shape: BoxShape.circle,
         color: _currentPage == index
             ? Colors.white
+            // ignore: deprecated_member_use
             : Colors.white.withOpacity(0.5),
       ),
     );

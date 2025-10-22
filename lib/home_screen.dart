@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class HomeScreen extends StatelessWidget {
   final String favoriteGenre;
 
-  HomeScreen({required this.favoriteGenre});
+  const HomeScreen({super.key, required this.favoriteGenre});
 
   @override
   Widget build(BuildContext context) {

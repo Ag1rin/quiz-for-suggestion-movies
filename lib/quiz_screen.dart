@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'dart:ui'; // For blur
+import 'package:shared_preferences/shared_preferences.dart'; // For saving genre
 import 'home_screen.dart'; // Import for going to home
 
 class QuizScreen extends StatefulWidget {
+  const QuizScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _QuizScreenState createState() => _QuizScreenState();
 }
 
-class _QuizScreenState extends State<QuizScreen>
-    with SingleTickerProviderStateMixin {
+class _QuizScreenState extends State<QuizScreen> {
   int currentQuestion = 0;
   Map<String, int> genreScores = {
     'Action': 0,
@@ -21,14 +24,10 @@ class _QuizScreenState extends State<QuizScreen>
     'Adventure': 0,
     'Fantasy': 0,
     'Animation': 0,
-    'Documentary': 0,
-    'Mystery': 0,
-    'Crime': 0,
-    'Biography': 0,
-    'Musical': 0,
   };
 
   List<Map<String, dynamic>> questions = [
+    // Reduced to 10 questions
     {
       'question':
           'Do you enjoy movies with intense action scenes and high-speed chases?',
@@ -79,56 +78,9 @@ class _QuizScreenState extends State<QuizScreen>
           'Are creative animated films with engaging stories for all ages interesting to you?',
       'genre': 'Animation',
     },
-    {
-      'question':
-          'Do you like documentary films that explore real-life events and facts?',
-      'genre': 'Documentary',
-    },
-    {
-      'question':
-          'Are mystery movies with puzzles and detective work your thing?',
-      'genre': 'Mystery',
-    },
-    {
-      'question':
-          'Do crime films involving investigations and criminal activities appeal to you?',
-      'genre': 'Crime',
-    },
-    {
-      'question':
-          'Are biographical movies about real people\'s lives and achievements inspiring?',
-      'genre': 'Biography',
-    },
-    {
-      'question':
-          'Do you enjoy musical films with songs, dances, and performances?',
-      'genre': 'Musical',
-    },
   ];
 
-  List<String?> answers = List.filled(15, null); // For storing answers
-  late AnimationController _animationController; // Controller for GIF animation
-  late Animation<double> _fadeAnimation; // Fade effect for reverse simulation
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 6), // Match your 10-second GIF
-    )..repeat(reverse: true); // Repeat with reverse
-    _fadeAnimation = Tween<double>(
-      begin: 0.3,
-      end: 1.0,
-    ).animate(_animationController); // Fade from slightly dim to full
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+  List<String?> answers = List.filled(10, null); // Updated for 10 questions
 
   void answerQuestion(String answer) {
     setState(() {
@@ -137,27 +89,28 @@ class _QuizScreenState extends State<QuizScreen>
         genreScores[questions[currentQuestion]['genre']] =
             (genreScores[questions[currentQuestion]['genre']] ?? 0) + 1;
       }
-      // Automatically go to next question if not the last
-      if (currentQuestion < 14) {
+      if (currentQuestion < 9) {
         currentQuestion++;
       }
     });
   }
 
   void nextQuestion() {
-    if (currentQuestion < 14) setState(() => currentQuestion++);
+    if (currentQuestion < 9) setState(() => currentQuestion++);
   }
 
   void previousQuestion() {
     if (currentQuestion > 0) setState(() => currentQuestion--);
   }
 
-  void finishQuiz() {
+  Future<void> finishQuiz() async {
     String favoriteGenre = genreScores.entries
         .reduce((a, b) => a.value > b.value ? a : b)
         .key;
-    // Save genre in SharedPreferences if needed
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('favoriteGenre', favoriteGenre); // Save genre
     Navigator.pushReplacement(
+      // ignore: use_build_context_synchronously
       context,
       MaterialPageRoute(
         builder: (_) => HomeScreen(favoriteGenre: favoriteGenre),
@@ -171,14 +124,15 @@ class _QuizScreenState extends State<QuizScreen>
       body: Stack(
         children: [
           Positioned.fill(
-            child: FadeTransition(
-              opacity: _fadeAnimation, // Fade in/out to simulate reverse
-              child: Image.asset('assets/background.gif', fit: BoxFit.cover),
-            ),
+            child: Image.asset(
+              'assets/background.gif',
+              fit: BoxFit.cover,
+            ), // Direct GIF without fade
           ),
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              // ignore: deprecated_member_use
               child: Container(color: Colors.black.withOpacity(0.3)),
             ),
           ),
@@ -191,33 +145,16 @@ class _QuizScreenState extends State<QuizScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Glass box for question
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Container(
-                              padding: EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                ),
-                              ),
-                              child: Text(
-                                questions[currentQuestion]['question'],
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
+                        Text(
+                          questions[currentQuestion]['question'],
+                          style: TextStyle(
+                            fontSize: 24,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 40),
-                        // Fixed Yes/No buttons
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -241,42 +178,19 @@ class _QuizScreenState extends State<QuizScreen>
                   ),
                 ),
               ),
-              // Glass box for Previous/Next buttons, not too close to bottom
               Padding(
-                padding: EdgeInsets.only(
-                  bottom: 100,
-                ), // More distance from bottom
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ), // Tight padding to fit buttons
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize:
-                            MainAxisSize.min, // Box fits buttons tightly
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (currentQuestion > 0)
-                            _glassButton('Previous', previousQuestion),
-                          if (currentQuestion > 0) SizedBox(width: 10),
-                          _glassButton(
-                            currentQuestion == 14 ? 'Finish' : 'Next',
-                            currentQuestion == 14 ? finishQuiz : nextQuestion,
-                          ),
-                        ],
-                      ),
+                padding: EdgeInsets.only(bottom: 100),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (currentQuestion > 0)
+                      _glassButton('Previous', previousQuestion),
+                    if (currentQuestion > 0) SizedBox(width: 10),
+                    _glassButton(
+                      currentQuestion == 9 ? 'Finish' : 'Next',
+                      currentQuestion == 9 ? finishQuiz : nextQuestion,
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -292,6 +206,7 @@ class _QuizScreenState extends State<QuizScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.white.withOpacity(0.2), // Faint glow effect
             blurRadius: 10,
             spreadRadius: 2,
@@ -305,7 +220,9 @@ class _QuizScreenState extends State<QuizScreen>
           child: ElevatedButton(
             onPressed: onPressed,
             style: ElevatedButton.styleFrom(
+              // ignore: deprecated_member_use
               backgroundColor: Colors.white.withOpacity(0.2),
+              // ignore: deprecated_member_use
               side: BorderSide(color: Colors.white.withOpacity(0.3)),
               padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
             ),
