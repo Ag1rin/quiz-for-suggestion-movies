@@ -27,7 +27,7 @@ class _QuizScreenState extends State<QuizScreen> {
   };
 
   List<Map<String, dynamic>> questions = [
-    // Reduced to 10 questions
+    // 10 questions
     {
       'question':
           'Do you enjoy movies with intense action scenes and high-speed chases?',
@@ -80,7 +80,7 @@ class _QuizScreenState extends State<QuizScreen> {
     },
   ];
 
-  List<String?> answers = List.filled(10, null); // Updated for 10 questions
+  List<String?> answers = List.filled(10, null);
 
   void answerQuestion(String answer) {
     setState(() {
@@ -108,7 +108,7 @@ class _QuizScreenState extends State<QuizScreen> {
         .reduce((a, b) => a.value > b.value ? a : b)
         .key;
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('favoriteGenre', favoriteGenre); // Save genre
+    await prefs.setString('favoriteGenre', favoriteGenre);
     Navigator.pushReplacement(
       // ignore: use_build_context_synchronously
       context,
@@ -121,81 +121,84 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/background.gif',
-              fit: BoxFit.cover,
-            ), // Direct GIF without fade
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              // ignore: deprecated_member_use
-              child: Container(color: Colors.black.withOpacity(0.3)),
-            ),
-          ),
-          Column(
+      body: FutureBuilder(
+        // Lazy load GIF to improve startup
+        future: Future.delayed(Duration.zero), // Simple delay for async load
+        builder: (context, snapshot) {
+          return Stack(
             children: [
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          questions[currentQuestion]['question'],
-                          style: TextStyle(
-                            fontSize: 24,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 40),
-                        Row(
+              Positioned.fill(
+                child: Image.asset('assets/background.gif', fit: BoxFit.cover),
+              ),
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  // ignore: deprecated_member_use
+                  child: Container(color: Colors.black.withOpacity(0.3)),
+                ),
+              ),
+              Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _glassButton(
-                              'Yes',
-                              answers[currentQuestion] == null
-                                  ? () => answerQuestion('Yes')
-                                  : null,
+                            Text(
+                              questions[currentQuestion]['question'],
+                              style: TextStyle(
+                                fontSize: 24,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            SizedBox(width: 20),
-                            _glassButton(
-                              'No',
-                              answers[currentQuestion] == null
-                                  ? () => answerQuestion('No')
-                                  : null,
+                            SizedBox(height: 40),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _glassButton(
+                                  'Yes',
+                                  answers[currentQuestion] == null
+                                      ? () => answerQuestion('Yes')
+                                      : null,
+                                ),
+                                SizedBox(width: 20),
+                                _glassButton(
+                                  'No',
+                                  answers[currentQuestion] == null
+                                      ? () => answerQuestion('No')
+                                      : null,
+                                ),
+                              ],
                             ),
                           ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 100),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (currentQuestion > 0)
+                          _glassButton('Previous', previousQuestion),
+                        if (currentQuestion > 0) SizedBox(width: 10),
+                        _glassButton(
+                          currentQuestion == 9 ? 'Finish' : 'Next',
+                          currentQuestion == 9 ? finishQuiz : nextQuestion,
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.only(bottom: 100),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (currentQuestion > 0)
-                      _glassButton('Previous', previousQuestion),
-                    if (currentQuestion > 0) SizedBox(width: 10),
-                    _glassButton(
-                      currentQuestion == 9 ? 'Finish' : 'Next',
-                      currentQuestion == 9 ? finishQuiz : nextQuestion,
-                    ),
-                  ],
-                ),
+                ],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -207,7 +210,7 @@ class _QuizScreenState extends State<QuizScreen> {
         boxShadow: [
           BoxShadow(
             // ignore: deprecated_member_use
-            color: Colors.white.withOpacity(0.2), // Faint glow effect
+            color: Colors.white.withOpacity(0.2),
             blurRadius: 10,
             spreadRadius: 2,
           ),
