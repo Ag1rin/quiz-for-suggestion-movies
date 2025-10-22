@@ -1,5 +1,5 @@
 name: quiz_suggestion
-description: "A new Flutter project."
+description: "A Flutter app that suggests daily movies based on a 15-question quiz."
 publish_to: 'none'
 version: 0.1.0
 
@@ -9,11 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.3.2  
-  flutter_blurhash: ^0.8.2    
-  http: ^1.2.2                
-  flutter_local_notifications: ^17.2.3  
-  timezone: ^0.9.4
+  shared_preferences: ^2.3.2  # For saving first-time user status
+  flutter_blurhash: ^0.8.2    # For blurred background effect
+  http: ^1.2.2                # For TMDB API calls
+  flutter_local_notifications: ^17.2.3  # For daily movie notifications
+  timezone: ^0.9.4            # For scheduling notifications
 
 dev_dependencies:
   flutter_test:
@@ -22,3 +22,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/background.gif  # Background GIF for blurred effect

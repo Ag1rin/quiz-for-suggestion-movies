@@ -7,9 +7,33 @@ class OnboardingScreen extends StatefulWidget {
   _OnboardingScreenState createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  late AnimationController _animationController; // Controller for GIF animation
+  late Animation<double> _fadeAnimation; // Fade effect for reverse simulation
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize animation controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 3), // Adjust based on your GIF length
+    )..repeat(reverse: true); // Repeat with reverse
+    _fadeAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1,
+    ).animate(_animationController);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +41,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/background.gif', fit: BoxFit.cover),
+            child: FadeTransition(
+              opacity: _fadeAnimation, // Fade in/out to simulate reverse
+              child: Image.asset('assets/background.gif', fit: BoxFit.cover),
+            ),
           ),
           Positioned.fill(
             child: BackdropFilter(
@@ -76,9 +103,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ],
                 ),
                 SizedBox(height: 20),
-                Text(
-                  '${_currentPage + 1}/3',
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) => _buildDot(index)),
                 ),
               ],
             ),
@@ -129,6 +156,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           child: Text(text, style: TextStyle(color: Colors.white)),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDot(int index) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 5),
+      width: _currentPage == index ? 12 : 8,
+      height: _currentPage == index ? 12 : 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _currentPage == index
+            ? Colors.white
+            : Colors.white.withOpacity(0.5),
       ),
     );
   }
