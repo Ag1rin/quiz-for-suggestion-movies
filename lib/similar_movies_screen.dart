@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'config.dart'; // Import config
+import 'dart:ui'; // For blur
+import 'config.dart';
 
 class SimilarMoviesScreen extends StatefulWidget {
   final String favoriteGenre;
@@ -13,12 +14,23 @@ class SimilarMoviesScreen extends StatefulWidget {
   SimilarMoviesScreenState createState() => SimilarMoviesScreenState();
 }
 
-class SimilarMoviesScreenState extends State<SimilarMoviesScreen> {
+class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
+    with SingleTickerProviderStateMixin {
   List<dynamic> movies = [];
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat(reverse: true);
+    _fadeAnimation = Tween<double>(
+      begin: 0.2,
+      end: 1.0,
+    ).animate(_animationController);
     _fetchMovies();
   }
 
@@ -43,31 +55,53 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen> {
   }
 
   @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: movies.length,
-      itemBuilder: (context, index) {
-        var movie = movies[index];
-        return ListTile(
-          leading: Image.network(
-            'https://image.tmdb.org/t/p/w200${movie['poster_path']}',
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Image.asset('assets/main.gif', fit: BoxFit.cover),
           ),
-          title: Text(
-            movie['title'],
-            style: const TextStyle(color: Colors.white),
+        ),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.black.withAlpha(76)),
           ),
-          subtitle: Text(
-            'Genre: ${widget.favoriteGenre}',
-            style: const TextStyle(color: Colors.grey),
-          ),
-          trailing: IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.white),
-            onPressed: () {
-              _addToFavorites(movie);
-            },
-          ),
-        );
-      },
+        ),
+        ListView.builder(
+          itemCount: movies.length,
+          itemBuilder: (context, index) {
+            var movie = movies[index];
+            return ListTile(
+              leading: Image.network(
+                'https://image.tmdb.org/t/p/w200${movie['poster_path']}',
+              ),
+              title: Text(
+                movie['title'],
+                style: const TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                'Genre: ${widget.favoriteGenre}',
+                style: const TextStyle(color: Colors.grey),
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.favorite_border, color: Colors.white),
+                onPressed: () {
+                  _addToFavorites(movie);
+                },
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

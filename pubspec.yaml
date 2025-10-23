@@ -24,3 +24,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/background.gif  # Background GIF for blurred effect
+    - assets/main.gif

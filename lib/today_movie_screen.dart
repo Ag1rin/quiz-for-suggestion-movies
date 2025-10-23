@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'config.dart'; // Import config
+import 'dart:ui'; // For blur
+import 'config.dart';
 
 class TodayMovieScreen extends StatefulWidget {
   final String favoriteGenre;
@@ -13,12 +14,23 @@ class TodayMovieScreen extends StatefulWidget {
   TodayMovieScreenState createState() => TodayMovieScreenState();
 }
 
-class TodayMovieScreenState extends State<TodayMovieScreen> {
+class TodayMovieScreenState extends State<TodayMovieScreen>
+    with SingleTickerProviderStateMixin {
   Map<String, dynamic>? lastMovie;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat(reverse: true);
+    _fadeAnimation = Tween<double>(
+      begin: 0.2,
+      end: 1.0,
+    ).animate(_animationController);
     _loadLastMovie();
   }
 
@@ -58,26 +70,48 @@ class TodayMovieScreenState extends State<TodayMovieScreen> {
   }
 
   @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Center(
-      child: lastMovie != null
-          ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.network(
-                  'https://image.tmdb.org/t/p/w500${lastMovie!['poster_path']}',
-                ),
-                Text(
-                  lastMovie!['title'],
-                  style: const TextStyle(color: Colors.white, fontSize: 24),
-                ),
-                Text(
-                  'Genre: ${widget.favoriteGenre}, Runtime: ${lastMovie!['runtime'] ?? 'N/A'} min, Language: ${lastMovie!['original_language'] ?? 'N/A'}',
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ],
-            )
-          : const CircularProgressIndicator(),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Image.asset('assets/main.gif', fit: BoxFit.cover),
+          ),
+        ),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.black.withAlpha(76)),
+          ),
+        ),
+        Center(
+          child: lastMovie != null
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.network(
+                      'https://image.tmdb.org/t/p/w500${lastMovie!['poster_path']}',
+                    ),
+                    Text(
+                      lastMovie!['title'],
+                      style: const TextStyle(color: Colors.white, fontSize: 24),
+                    ),
+                    Text(
+                      'Genre: ${widget.favoriteGenre}, Runtime: ${lastMovie!['runtime'] ?? 'N/A'} min, Language: ${lastMovie!['original_language'] ?? 'N/A'}',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                )
+              : const CircularProgressIndicator(),
+        ),
+      ],
     );
   }
 }
