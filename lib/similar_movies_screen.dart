@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:ui'; // For blur
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart'; // Added for caching images
 import 'config.dart';
 
 class SimilarMoviesScreen extends StatefulWidget {
@@ -14,8 +15,7 @@ class SimilarMoviesScreen extends StatefulWidget {
   SimilarMoviesScreenState createState() => SimilarMoviesScreenState();
 }
 
-class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
-    with SingleTickerProviderStateMixin {
+class SimilarMoviesScreenState extends State<SimilarMoviesScreen> with SingleTickerProviderStateMixin {
   List<dynamic> movies = [];
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -27,10 +27,7 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
-    _fadeAnimation = Tween<double>(
-      begin: 0.2,
-      end: 1.0,
-    ).animate(_animationController);
+    _fadeAnimation = Tween<double>(begin: 0.2, end: 1.0).animate(_animationController);
     _fetchMovies();
   }
 
@@ -48,10 +45,17 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
       'Animation': '16',
     };
     String genreId = genreIds[widget.favoriteGenre] ?? '28';
-    String url =
-        'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId';
-    final response = await http.get(Uri.parse(url));
-    setState(() => movies = json.decode(response.body)['results']);
+    String url = 'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        setState(() => movies = json.decode(response.body)['results']);
+      } else {
+        throw Exception('Failed to load movies: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching movies: $e');
+    }
   }
 
   @override
@@ -81,17 +85,16 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
           itemBuilder: (context, index) {
             var movie = movies[index];
             return ListTile(
-              leading: Image.network(
-                'https://image.tmdb.org/t/p/w200${movie['poster_path']}',
+              leading: CachedNetworkImage(
+                imageUrl: 'https://image.tmdb.org/t/p/w200${movie['poster_path'] ?? ''}',
+                placeholder: (context, url) => const CircularProgressIndicator(),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+                fit: BoxFit.cover,
+                width: 50,
+                height: 75,
               ),
-              title: Text(
-                movie['title'],
-                style: const TextStyle(color: Colors.white),
-              ),
-              subtitle: Text(
-                'Genre: ${widget.favoriteGenre}',
-                style: const TextStyle(color: Colors.grey),
-              ),
+              title: Text(movie['title'] ?? 'No Title', style: const TextStyle(color: Colors.white)),
+              subtitle: Text('Genre: ${widget.favoriteGenre}', style: const TextStyle(color: Colors.grey)),
               trailing: IconButton(
                 icon: const Icon(Icons.favorite_border, color: Colors.white),
                 onPressed: () {
@@ -108,7 +111,7 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
   Future<void> _addToFavorites(Map movie) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> favorites = prefs.getStringList('favorites') ?? [];
-    favorites.add(jsonEncode(movie));
+    favorites.add(json.encode(movie));
     prefs.setStringList('favorites', favorites);
   }
 }

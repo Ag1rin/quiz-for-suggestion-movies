@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:ui'; // For blur
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart'; // Added for caching images
 import 'config.dart';
 
 class TodayMovieScreen extends StatefulWidget {
@@ -14,8 +15,7 @@ class TodayMovieScreen extends StatefulWidget {
   TodayMovieScreenState createState() => TodayMovieScreenState();
 }
 
-class TodayMovieScreenState extends State<TodayMovieScreen>
-    with SingleTickerProviderStateMixin {
+class TodayMovieScreenState extends State<TodayMovieScreen> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? lastMovie;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -27,10 +27,7 @@ class TodayMovieScreenState extends State<TodayMovieScreen>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
-    _fadeAnimation = Tween<double>(
-      begin: 0.2,
-      end: 1.0,
-    ).animate(_animationController);
+    _fadeAnimation = Tween<double>(begin: 0.2, end: 1.0).animate(_animationController);
     _loadLastMovie();
   }
 
@@ -38,9 +35,7 @@ class TodayMovieScreenState extends State<TodayMovieScreen>
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? lastMovieJson = prefs.getString('lastMovie');
     if (lastMovieJson != null) {
-      setState(
-        () => lastMovie = json.decode(lastMovieJson) as Map<String, dynamic>?,
-      );
+      setState(() => lastMovie = json.decode(lastMovieJson) as Map<String, dynamic>?);
     } else {
       var movie = await _getMovieRecommendation(widget.favoriteGenre);
       setState(() => lastMovie = movie);
@@ -62,11 +57,19 @@ class TodayMovieScreenState extends State<TodayMovieScreen>
       'Animation': '16',
     };
     String genreId = genreIds[genre] ?? '28';
-    String url =
-        'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId';
-    final response = await http.get(Uri.parse(url));
-    var results = json.decode(response.body)['results'] as List<dynamic>;
-    return results.isNotEmpty ? results[0] as Map<String, dynamic> : {};
+    String url = 'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        var results = json.decode(response.body)['results'] as List<dynamic>;
+        return results.isNotEmpty ? results[0] as Map<String, dynamic> : {};
+      } else {
+        throw Exception('Failed to load movie: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching movie: $e');
+      return {};
+    }
   }
 
   @override
@@ -96,13 +99,15 @@ class TodayMovieScreenState extends State<TodayMovieScreen>
               ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.network(
-                      'https://image.tmdb.org/t/p/w500${lastMovie!['poster_path']}',
+                    CachedNetworkImage(
+                      imageUrl: 'https://image.tmdb.org/t/p/w500${lastMovie!['poster_path'] ?? ''}',
+                      placeholder: (context, url) => const CircularProgressIndicator(),
+                      errorWidget: (context, url, error) => const Icon(Icons.error),
+                      fit: BoxFit.cover,
+                      width: 200,
+                      height: 300,
                     ),
-                    Text(
-                      lastMovie!['title'],
-                      style: const TextStyle(color: Colors.white, fontSize: 24),
-                    ),
+                    Text(lastMovie!['title'] ?? 'No Title', style: const TextStyle(color: Colors.white, fontSize: 24)),
                     Text(
                       'Genre: ${widget.favoriteGenre}, Runtime: ${lastMovie!['runtime'] ?? 'N/A'} min, Language: ${lastMovie!['original_language'] ?? 'N/A'}',
                       style: const TextStyle(color: Colors.white),
