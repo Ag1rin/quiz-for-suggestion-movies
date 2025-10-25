@@ -55,6 +55,7 @@ class HomeScreenState extends State<HomeScreen>
 
     await showDialog(
       context: context,
+      // ignore: deprecated_member_use
       barrierColor: Colors.black.withOpacity(0.3),
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
@@ -65,12 +66,12 @@ class HomeScreenState extends State<HomeScreen>
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white.withOpacity(0.3)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withOpacity(0.3),
                     blurRadius: 10,
                     spreadRadius: 2,
                   ),
