@@ -8,7 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'config.dart';
 
-/// Today's Movie Screen: Full scroll, title above poster, details, trailer, reviews
+/// Today's Movie Screen: Full scroll, title above poster, details, trailer in glass card
 class TodayMovieScreen extends StatefulWidget {
   final String favoriteGenre;
   const TodayMovieScreen({super.key, required this.favoriteGenre});
@@ -23,6 +23,7 @@ class _TodayMovieScreenState extends State<TodayMovieScreen>
   List<dynamic> reviews = [];
   String? trailerKey;
   bool loading = true;
+  late YoutubePlayerController _youtubeController;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
@@ -50,6 +51,18 @@ class _TodayMovieScreenState extends State<TodayMovieScreen>
     } else {
       await _fetchTodayMovie();
     }
+
+    if (trailerKey != null) {
+      _youtubeController = YoutubePlayerController(
+        initialVideoId: trailerKey!,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false, // خودکار پلی نمی‌شه
+          mute: false,
+          showLiveFullscreenButton: false,
+        ),
+      );
+    }
+
     setState(() => loading = false);
   }
 
@@ -82,7 +95,12 @@ class _TodayMovieScreenState extends State<TodayMovieScreen>
     final details = jsonDecode(detRes.body);
 
     final videos = details['videos']['results'] as List;
-    trailerKey = videos.isNotEmpty ? videos.first['key'] : null;
+    trailerKey = videos.isNotEmpty
+        ? videos.firstWhere(
+            (v) => v['type'] == 'Trailer',
+            orElse: () => videos.first,
+          )['key']
+        : null;
 
     reviews = (details['reviews']['results'] as List).take(3).toList();
 
@@ -164,19 +182,15 @@ class _TodayMovieScreenState extends State<TodayMovieScreen>
               movie?['original_language']?.toUpperCase() ?? 'N/A',
             ),
 
-            // Trailer
+            // Trailer in Glass Card
             if (trailerKey != null) ...[
               const SizedBox(height: 20),
               const Text(
                 'Trailer:',
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
-              YoutubePlayer(
-                controller: YoutubePlayerController(
-                  initialVideoId: trailerKey!,
-                  flags: const YoutubePlayerFlags(autoPlay: false, mute: false),
-                ),
-              ),
+              const SizedBox(height: 8),
+              _glassYoutubeCard(),
             ],
 
             // Reviews
@@ -204,6 +218,44 @@ class _TodayMovieScreenState extends State<TodayMovieScreen>
     );
   }
 
+  /// Glass-morphism YouTube Player Card
+  Widget _glassYoutubeCard() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.2),
+            blurRadius: 12,
+            spreadRadius: 3,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            color: Colors.white.withValues(alpha: 0.15),
+            padding: const EdgeInsets.all(8),
+            child: YoutubePlayer(
+              controller: _youtubeController,
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: Colors.white,
+              progressColors: const ProgressBarColors(
+                playedColor: Colors.red,
+                handleColor: Colors.redAccent,
+              ),
+              onReady: () {
+                // فقط وقتی کاربر دکمه Play رو زد، پلی می‌شه
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _infoTile(String label, String value) {
     return ListTile(
       title: Text(
@@ -216,6 +268,7 @@ class _TodayMovieScreenState extends State<TodayMovieScreen>
   @override
   void dispose() {
     _animCtrl.dispose();
+    _youtubeController.dispose();
     super.dispose();
   }
 }
