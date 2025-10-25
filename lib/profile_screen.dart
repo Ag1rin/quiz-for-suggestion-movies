@@ -8,8 +8,9 @@ import 'dart:convert';
 import 'dart:ui';
 import 'config.dart';
 
-/// Profile screen – shows user info, notification settings and favorite movies
-/// with full scroll, glass-morphism UI and background GIF animation.
+/// Profile Screen: User info, notification settings, and favorites list
+/// - Shows runtime with "min"
+/// - Remove button to delete from favorites
 class ProfileScreen extends StatefulWidget {
   final String favoriteGenre;
 
@@ -94,7 +95,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                 setState(() => userName = name);
                 await prefs.setString('userName', name);
               }
-              // ignore: use_build_context_synchronously
               if (mounted) Navigator.of(ctx).pop();
             },
             child: const Text('Save'),
@@ -142,8 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           importance: Importance.high,
         ),
       ),
-      androidScheduleMode:
-          AndroidScheduleMode.exactAllowWhileIdle, // Fixed deprecated
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
@@ -179,21 +178,23 @@ class _ProfileScreenState extends State<ProfileScreen>
     return results.isNotEmpty ? results.first as Map<String, dynamic> : {};
   }
 
-  /// Fetch extra movie details (director, runtime, rating) – used when saving favorites
-  // ignore: unused_element
-  Future<Map<String, dynamic>> _getMovieDetails(int movieId) async {
-    final url =
-        'https://api.themoviedb.org/3/movie/$movieId?api_key=${Config.tmdbApiKey}&append_to_response=credits';
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode != 200) return {};
+  /// Remove movie from favorites and show SnackBar
+  Future<void> _removeFromFavorites(int index) async {
+    final movie = favorites[index];
+    final prefs = await SharedPreferences.getInstance();
+    favorites.removeAt(index);
+    await prefs.setStringList(
+      'favorites',
+      favorites.map((e) => jsonEncode(e)).toList(),
+    );
+    setState(() {});
 
-    final data = json.decode(response.body);
-    final director = data['credits']['crew'].firstWhere(
-      (p) => p['job'] == 'Director',
-      orElse: () => {'name': 'N/A'},
-    )['name'];
-    data['director'] = director;
-    return data;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${movie['title']} removed from favorites'),
+        backgroundColor: Colors.red.withValues(alpha: 0.8),
+      ),
+    );
   }
 
   @override
@@ -219,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(color: Colors.black.withAlpha(76)),
+              child: Container(color: Colors.black.withValues(alpha: 0.3)),
             ),
           ),
 
@@ -234,9 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(
-                          alpha: 0.3,
-                        ), // Fixed deprecated
+                        color: Colors.white.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),
@@ -278,9 +277,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   children: [
                     DropdownButton<int>(
                       value: intervalDays,
-                      dropdownColor: Colors.black.withValues(
-                        alpha: 0.8,
-                      ), // Fixed
+                      dropdownColor: Colors.black.withValues(alpha: 0.8),
                       style: const TextStyle(color: Colors.white),
                       items: [1, 3, 7]
                           .map(
@@ -327,18 +324,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
               const SizedBox(height: 10),
 
-              // Favorites list – each item shows poster, title, director, genres, runtime, rating
-              ...favorites.map((movie) {
-                // Some fields may be missing – provide fallbacks
-                final director = movie['director']?.toString() ?? 'N/A';
-                final genres =
-                    (movie['genres'] as List<dynamic>?)
-                        ?.map((g) => g['name']?.toString() ?? '')
-                        .where((s) => s.isNotEmpty)
-                        .join(', ') ??
-                    widget.favoriteGenre;
-                final runtime = movie['runtime']?.toString() ?? 'N/A';
-                final rating = movie['vote_average']?.toString() ?? 'N/A';
+              // Favorites list – only title + runtime + delete button
+              ...favorites.asMap().entries.map((entry) {
+                final index = entry.key;
+                final movie = entry.value;
 
                 return Card(
                   color: Colors.transparent,
@@ -364,30 +353,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                       movie['title'] ?? 'No Title',
                       style: const TextStyle(color: Colors.white),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Director: $director',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        Text(
-                          'Genre: $genres',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        Text(
-                          'Runtime: $runtime min',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        Text(
-                          'Rating: $rating / 10',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      ],
+                    subtitle: Text(
+                      'Runtime: ${movie['runtime'] ?? 'N/A'} min',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _removeFromFavorites(index),
                     ),
                   ),
                 );
-              // ignore: unnecessary_to_list_in_spreads
               }).toList(),
 
               const SizedBox(height: 20),
@@ -405,7 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.white.withValues(alpha: 0.2), // Fixed deprecated
+            color: Colors.white.withValues(alpha: 0.2),
             blurRadius: 10,
             spreadRadius: 2,
           ),
@@ -418,10 +393,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: ElevatedButton(
             onPressed: onPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.2), // Fixed
-              side: BorderSide(
-                color: Colors.white.withValues(alpha: 0.3),
-              ), // Fixed
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
             ),
             child: Text(text, style: const TextStyle(color: Colors.white)),
