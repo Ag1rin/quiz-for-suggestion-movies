@@ -1,123 +1,134 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'config.dart';
 
-/// Similar Movies Screen: Infinite scroll, random refresh, favorite toggle with SnackBar
 class SimilarMoviesScreen extends StatefulWidget {
   final String favoriteGenre;
+
   const SimilarMoviesScreen({super.key, required this.favoriteGenre});
 
   @override
-  State<SimilarMoviesScreen> createState() => _SimilarMoviesScreenState();
+  SimilarMoviesScreenState createState() => SimilarMoviesScreenState();
 }
 
-class _SimilarMoviesScreenState extends State<SimilarMoviesScreen>
+class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
     with SingleTickerProviderStateMixin {
   List<dynamic> movies = [];
-  List<String> favoriteIds = [];
-  bool _loading = false;
+  List<String> favoritesIds =
+      []; // For checking duplicates and show filled heart
+  int _currentPage = 1;
+  bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-  late final AnimationController _animCtrl;
-  late final Animation<double> _fadeAnim;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(
+    _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
-    _fadeAnim = Tween<double>(begin: 0.2, end: 1.0).animate(_animCtrl);
+    _fadeAnimation = Tween<double>(
+      begin: 0.2,
+      end: 1.0,
+    ).animate(_animationController);
     _loadFavorites();
-    _fetchRandomPage();
+    _fetchMovies(initialLoad: true);
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 200 &&
-          !_loading) {
-        _fetchRandomPage();
+          !_isLoading) {
+        _fetchMovies();
       }
     });
   }
 
-  /// Load favorite movie IDs
+  /// Load favorite movie IDs from SharedPreferences
   Future<void> _loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('favorites') ?? [];
-    favoriteIds = list.map((e) => jsonDecode(e)['id'].toString()).toList();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? favoritesJson = prefs.getStringList('favorites');
+
+    favoritesIds =
+        favoritesJson
+            ?.map((jsonStr) => jsonDecode(jsonStr)['id'].toString())
+            .toList() ??
+        [];
+
     setState(() {});
   }
 
-  /// Fetch random page from TMDB
-  Future<void> _fetchRandomPage({bool refresh = false}) async {
-    if (_loading) return;
-    setState(() => _loading = true);
-    if (refresh) {
+  /// Fetch movies from TMDB for the selected genre and page
+  Future<void> _fetchMovies({bool initialLoad = false}) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    if (initialLoad) {
       movies.clear();
+      _currentPage = 1;
     }
-
-    final genreId =
-        {
-          'Action': '28',
-          'Drama': '18',
-          'Comedy': '35',
-          'Horror': '27',
-          'Sci-Fi': '878',
-          'Romance': '10749',
-          'Thriller': '53',
-          'Adventure': '12',
-          'Fantasy': '14',
-          'Animation': '16',
-        }[widget.favoriteGenre] ??
-        '28';
-
-    final randomPage = Random().nextInt(50) + 1;
-    final url =
-        'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId&page=$randomPage';
-
+    Map<String, String> genreIds = {
+      'Action': '28',
+      'Drama': '18',
+      'Comedy': '35',
+      'Horror': '27',
+      'Sci-Fi': '878',
+      'Romance': '10749',
+      'Thriller': '53',
+      'Adventure': '12',
+      'Fantasy': '14',
+      'Animation': '16',
+    };
+    String genreId = genreIds[widget.favoriteGenre] ?? '28';
+    String url =
+        'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId&page=$_currentPage';
     try {
-      final res = await http.get(Uri.parse(url));
-      if (res.statusCode == 200) {
-        final newMovies = json.decode(res.body)['results'] as List;
-        setState(() => movies.addAll(newMovies));
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        var newMovies = json.decode(response.body)['results'] as List<dynamic>;
+        setState(() {
+          movies.addAll(newMovies);
+          _currentPage++;
+        });
+      } else {
+        print(
+          'Failed to load movies: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
-      debugPrint('Error fetching movies: $e');
+      print('Error fetching movies: $e');
     } finally {
-      setState(() => _loading = false);
+      setState(() => _isLoading = false);
     }
   }
 
-  /// Toggle favorite and show SnackBar
-  Future<void> _toggleFavorite(Map movie) async {
-    final id = movie['id'].toString();
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('favorites') ?? [];
+  Future<void> _refreshMovies() async {
+    await _fetchMovies(initialLoad: true);
+  }
 
-    if (favoriteIds.contains(id)) {
-      list.removeWhere((e) => jsonDecode(e)['id'].toString() == id);
-      favoriteIds.remove(id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${movie['title']} removed from favorites')),
-      );
-    } else {
-      list.add(jsonEncode(movie));
-      favoriteIds.add(id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${movie['title']} added to favorites')),
-      );
-    }
-    await prefs.setStringList('favorites', list);
-    setState(() {});
+  /// Add movie to favorites if not already added
+  Future<void> _addToFavorites(Map movie) async {
+    String movieId = movie['id'].toString();
+    if (favoritesIds.contains(movieId)) return; // Prevent duplicate
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> favorites = prefs.getStringList('favorites') ?? [];
+    favorites.add(json.encode(movie));
+    prefs.setStringList('favorites', favorites);
+    setState(() {
+      favoritesIds.add(movieId);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${movie['title']} added to favorites')),
+    );
   }
 
   @override
   void dispose() {
-    _animCtrl.dispose();
+    _animationController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -128,7 +139,7 @@ class _SimilarMoviesScreenState extends State<SimilarMoviesScreen>
       children: [
         Positioned.fill(
           child: FadeTransition(
-            opacity: _fadeAnim,
+            opacity: _fadeAnimation,
             child: Image.asset('assets/main.gif', fit: BoxFit.cover),
           ),
         ),
@@ -139,43 +150,48 @@ class _SimilarMoviesScreenState extends State<SimilarMoviesScreen>
           ),
         ),
         RefreshIndicator(
-          onRefresh: () => _fetchRandomPage(refresh: true),
+          onRefresh: _refreshMovies,
           child: ListView.builder(
             controller: _scrollController,
-            itemCount: movies.length + 1,
-            itemBuilder: (ctx, i) {
-              if (i >= movies.length) {
-                return _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : const SizedBox();
-              }
-              final m = movies[i];
-              final isFav = favoriteIds.contains(m['id'].toString());
-              return ListTile(
-                leading: CachedNetworkImage(
-                  imageUrl:
-                      'https://image.tmdb.org/t/p/w200${m['poster_path'] ?? ''}',
-                  width: 50,
-                  height: 75,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => const CircularProgressIndicator(),
-                ),
-                title: Text(
-                  m['title'] ?? '',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                subtitle: Text(
-                  'Runtime: ${m['runtime'] ?? 'N/A'} min',
-                  style: const TextStyle(color: Colors.grey),
-                ),
-                trailing: IconButton(
-                  icon: Icon(
-                    isFav ? Icons.favorite : Icons.favorite_border,
-                    color: Colors.white,
+            itemCount: movies.length + 1, // +1 for loading indicator
+            itemBuilder: (context, index) {
+              if (index < movies.length) {
+                var movie = movies[index];
+                String movieId = movie['id'].toString();
+                bool isFavorite = favoritesIds.contains(movieId);
+                return ListTile(
+                  leading: CachedNetworkImage(
+                    imageUrl:
+                        'https://image.tmdb.org/t/p/w200${movie['poster_path'] ?? ''}',
+                    placeholder: (context, url) => CircularProgressIndicator(),
+                    errorWidget: (context, url, error) => Icon(Icons.error),
+                    fit: BoxFit.cover,
+                    width: 50,
+                    height: 75,
                   ),
-                  onPressed: () => _toggleFavorite(m),
-                ),
-              );
+                  title: Text(
+                    movie['title'],
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    'Runtime: ${movie['runtime'] ?? 'N/A'} min',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  trailing: IconButton(
+                    icon: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      _addToFavorites(movie);
+                    },
+                  ),
+                );
+              } else {
+                return _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : SizedBox.shrink();
+              }
             },
           ),
         ),

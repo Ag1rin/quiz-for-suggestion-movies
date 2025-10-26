@@ -188,12 +188,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       favorites.map((e) => jsonEncode(e)).toList(),
     );
     setState(() {});
-
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${movie['title']} removed from favorites'),
-        backgroundColor: Colors.red.withValues(alpha: 0.8),
-      ),
+      SnackBar(content: Text('${movie['title']} removed from favorites')),
     );
   }
 
@@ -324,11 +320,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
               const SizedBox(height: 10),
 
-              // Favorites list – only title + runtime + delete button
+              // Favorites list – title + runtime + delete button
               ...favorites.asMap().entries.map((entry) {
                 final index = entry.key;
                 final movie = entry.value;
-
                 return Card(
                   color: Colors.transparent,
                   child: ListTile(
