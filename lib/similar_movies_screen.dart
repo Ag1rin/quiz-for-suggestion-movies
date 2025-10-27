@@ -15,11 +15,9 @@ class SimilarMoviesScreen extends StatefulWidget {
   SimilarMoviesScreenState createState() => SimilarMoviesScreenState();
 }
 
-class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
-    with SingleTickerProviderStateMixin {
+class SimilarMoviesScreenState extends State<SimilarMoviesScreen> with SingleTickerProviderStateMixin {
   List<dynamic> movies = [];
-  List<String> favoritesIds =
-      []; // For checking duplicates and show filled heart
+  List<String> favoritesIds = []; // For checking duplicates and show filled heart
   int _currentPage = 1;
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
@@ -33,16 +31,11 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
-    _fadeAnimation = Tween<double>(
-      begin: 0.2,
-      end: 1.0,
-    ).animate(_animationController);
+    _fadeAnimation = Tween<double>(begin: 0.2, end: 1.0).animate(_animationController);
     _loadFavorites();
     _fetchMovies(initialLoad: true);
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 200 &&
-          !_isLoading) {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 && !_isLoading) {
         _fetchMovies();
       }
     });
@@ -53,8 +46,7 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? favoritesJson = prefs.getStringList('favorites');
 
-    favoritesIds =
-        favoritesJson
+    favoritesIds = favoritesJson
             ?.map((jsonStr) => jsonDecode(jsonStr)['id'].toString())
             .toList() ??
         [];
@@ -62,7 +54,7 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
     setState(() {});
   }
 
-  /// Fetch movies from TMDB for the selected genre and page
+  /// Fetch movies from TMDB and get runtime for each
   Future<void> _fetchMovies({bool initialLoad = false}) async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
@@ -83,26 +75,40 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
       'Animation': '16',
     };
     String genreId = genreIds[widget.favoriteGenre] ?? '28';
-    String url =
-        'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId&page=$_currentPage';
+    String url = 'https://api.themoviedb.org/3/discover/movie?api_key=${Config.tmdbApiKey}&with_genres=$genreId&page=$_currentPage';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         var newMovies = json.decode(response.body)['results'] as List<dynamic>;
+        for (var movie in newMovies) {
+          movie['runtime'] = await _getMovieRuntime(movie['id']);
+        }
         setState(() {
           movies.addAll(newMovies);
           _currentPage++;
         });
       } else {
-        print(
-          'Failed to load movies: ${response.statusCode} - ${response.body}',
-        );
+        print('Failed to load movies: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('Error fetching movies: $e');
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  /// Get runtime for a single movie from TMDB
+  Future<int?> _getMovieRuntime(int movieId) async {
+    String url = 'https://api.themoviedb.org/3/movie/$movieId?api_key=${Config.tmdbApiKey}';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        return json.decode(response.body)['runtime'];
+      }
+    } catch (e) {
+      print('Error fetching runtime: $e');
+    }
+    return null;
   }
 
   Future<void> _refreshMovies() async {
@@ -146,7 +152,7 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
         Positioned.fill(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(color: Colors.black.withValues(alpha: 0.3)),
+            child: Container(color: Colors.black.withAlpha(76)),
           ),
         ),
         RefreshIndicator(
@@ -161,36 +167,24 @@ class SimilarMoviesScreenState extends State<SimilarMoviesScreen>
                 bool isFavorite = favoritesIds.contains(movieId);
                 return ListTile(
                   leading: CachedNetworkImage(
-                    imageUrl:
-                        'https://image.tmdb.org/t/p/w200${movie['poster_path'] ?? ''}',
+                    imageUrl: 'https://image.tmdb.org/t/p/w200${movie['poster_path'] ?? ''}',
                     placeholder: (context, url) => CircularProgressIndicator(),
                     errorWidget: (context, url, error) => Icon(Icons.error),
                     fit: BoxFit.cover,
                     width: 50,
                     height: 75,
                   ),
-                  title: Text(
-                    movie['title'],
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(
-                    'Runtime: ${movie['runtime'] ?? 'N/A'} min',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  title: Text(movie['title'], style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Runtime: ${movie['runtime'] ?? 'N/A'} min', style: TextStyle(color: Colors.grey)),
                   trailing: IconButton(
-                    icon: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: Colors.white,
-                    ),
+                    icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: Colors.white),
                     onPressed: () {
                       _addToFavorites(movie);
                     },
                   ),
                 );
               } else {
-                return _isLoading
-                    ? Center(child: CircularProgressIndicator())
-                    : SizedBox.shrink();
+                return _isLoading ? Center(child: CircularProgressIndicator()) : SizedBox.shrink();
               }
             },
           ),
